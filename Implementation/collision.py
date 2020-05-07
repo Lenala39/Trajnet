@@ -6,7 +6,7 @@ class Collision():
     def __init__(self):
         pass
 
-    def check_for_collisions(self, next_step_x, next_step_y, last_step_x, last_step_y, indexer):
+    def check_for_collisions(self, next_step_x, next_step_y, last_step_x, last_step_y, scene_id, indexer):
         """
         Checks whether the computed next step will create a collision
         :param: next_step_x
@@ -18,18 +18,24 @@ class Collision():
         """
         # get frames that cross in the next step that should be taken
         grid_frames = indexer.get_frames_at_xy(next_step_x, next_step_y)
+        scene_frames = indexer.get_all_frames_by_scene_id(scene_id=scene_id)[0]
+        grid_frames_in_scene = []
+        for g_frame in grid_frames:
+            for s_frame in scene_frames:
+                if g_frame.frame == s_frame.frame and g_frame.pedestrian == s_frame.pedestrian:
+                    grid_frames_in_scene.append(g_frame)
+
 
         cell_tracks = {}
         # iterate over all frames in Grid-Cell
-        for frame in grid_frames:
+        for frame in grid_frames_in_scene:
             if not (frame.pedestrian in cell_tracks.keys()):
                 # get all frames of the pedestrian (not just in grid cell)
                 pedestrian_frames = indexer.get_all_frames_by_ped_id(frame.pedestrian)
                 # filter so that only one frame before or after or the same frame remain in list
                 try:
                     pedestrian_frames = [fr for fr in pedestrian_frames if (
-                            (fr.frame == frame.frame + 1) or (fr.frame == frame.frame - 1) or (
-                            fr.frame == frame.frame))]
+                            (fr.frame == frame.frame + 1) or (fr.frame == frame.frame))]
                 except IndexError:
                     pass
                 cell_tracks[frame.pedestrian] = indexer.get_ped_traj_xy(pedestrian_frames)
@@ -39,16 +45,13 @@ class Collision():
             new_line = ([next_step_x, next_step_y], [last_step_x, last_step_y])
 
             # create line that crosses in the cell
-            line2 = (track[1], track[0])
-            collide1, intersection_point = self.line_intersection(line2, new_line)
+            try:
+                line2 = (track[1], track[0])
+                collide, intersection_point = self.line_intersection(line2, new_line)
+            except IndexError:
+                collide = False
 
-            # if we have an incoming frame and an outgoing from from grid cell
-            collide2 = None
-            if len(track) == 3:
-                line3 = (track[2], track[1])
-                collide2, intersection_point = self.line_intersection(line3, new_line)
-
-            if collide1 or collide2:
+            if collide:
                 return True
             else:
                 continue

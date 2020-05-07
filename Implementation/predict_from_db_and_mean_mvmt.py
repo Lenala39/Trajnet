@@ -138,7 +138,7 @@ class Indexer(object):
             if [p.x, p.y] not in xy:
                 xy.append([p.x, p.y])
                 ped_traj.append(p)
-                print(i, p)
+                # print(i, p)
         return ped_traj
 
     def get_ped_traj_xy(self, all_ped_frames):
@@ -148,7 +148,7 @@ class Indexer(object):
             if [p.x, p.y] not in xy:
                 xy.append([p.x, p.y])
                 ped_traj.append(p)
-                print(i, p)
+                # print(i, p)
         return xy
 
     def get_all_frames_by_scene_id(self, scene_id):
@@ -222,8 +222,8 @@ class Indexer(object):
 
         # check for collisions when creating new path
         col_object = collision.Collision()
-        line_collision = col_object.check_for_collisions(next_step_x, next_step_y, last_step_x, last_step_y,
-                                                         self)
+        line_collision = col_object.check_for_collisions(next_step_x, next_step_y, last_step_x,
+                                                         last_step_y, scene_id=scene_id, indexer=self)
 
         if not line_collision:
             # extend line to be plotted with this
@@ -236,7 +236,7 @@ class Indexer(object):
             new_track = TrackRow(frame_id, ped_id, next_step_x, next_step_y, None, scene_id)
             self.extend_grid(track=new_track, pre_x=last_step_x, pre_y=last_step_y)
         else:
-            raise Exception("Intersection Found")
+            pass
 
         return line_ped_x, line_ped_y, line_ped_x_mean, line_ped_y_mean
 
@@ -261,7 +261,6 @@ class Indexer(object):
         backtracking_line_y = line_ped_y[0:len(line_ped_y)-backtracking_steps]
 
 
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--ndjson', help='trajnet dataset file')
@@ -272,9 +271,9 @@ def main():
     print(args.ndjson)
     indexer = Indexer(args.ndjson, args.n)
     grid = indexer.get_grid()
-    print([indexer.x_max, indexer.x_min, indexer.y_max, indexer.y_min])
+    '''print([indexer.x_max, indexer.x_min, indexer.y_max, indexer.y_min])
     for p in indexer.get_frames_at_xy(indexer.tracks[5].x, indexer.tracks[5].y):
-        print(p)
+        print(p)'''
 
     scene_id = args.scene_id
     all_frames_by_scene_id, unique_pedestrians = indexer.get_all_frames_by_scene_id(scene_id)
@@ -296,16 +295,17 @@ def main():
     #     all_ped_frames = indexer.get_all_frames_by_ped_id(ped)
     #     ped_traj = indexer.get_ped_traj(all_ped_frames, ped)
     #     ax = plt.plot([p.x for p in all_ped_frames], [p.y for p in all_ped_frames], '*')
+    print(scene_prediction_datastracture.keys())
     for p in scene_prediction_datastracture.keys():
+
         line_ped_x = []
         line_ped_y = []
         line_ped_x_in = []
         line_ped_y_in = []
         line_ped_x_mean = []
         line_ped_y_mean = []
-
         # iterate over all frames that the scene has
-        for i in range(indexer.scene_frames_start_end[scene_id][0], indexer.scene_frames_start_end[scene_id][1]):
+        for i in range(indexer.scene_frames_start_end[scene_id][0], indexer.scene_frames_start_end[scene_id][1]+1):
             try:
                 # append the values found in the database
                 line_ped_x.append(scene_prediction_datastracture[p][i].x)
@@ -315,20 +315,19 @@ def main():
                     line_ped_x_in.append(scene_prediction_datastracture[p][i].x)
                     line_ped_y_in.append(scene_prediction_datastracture[p][i].y)
             except:  # no database entries found
-                try:
-                    # try to predict the movement by taking mean movement of pedestrian before
-                    line_ped_x, line_ped_y, line_ped_x_mean, line_ped_y_mean = indexer.predict_mean_movement(line_ped_x,
-                                                                                                             line_ped_y,
-                                                                                                             line_ped_x_mean,
-                                                                                                             line_ped_y_mean,
-                                                                                                             ped_id=p,
-                                                                                                             scene_id=scene_id,
-                                                                                                             frame_id=i)
-                except Exception:
-                    indexer.backtracking(line_ped_x, line_ped_y, line_ped_x_in, line_ped_y_in)
+
+                # try to predict the movement by taking mean movement of pedestrian before
+                line_ped_x, line_ped_y, line_ped_x_mean, line_ped_y_mean = indexer.predict_mean_movement(line_ped_x,
+                                                                                                         line_ped_y,
+                                                                                                         line_ped_x_mean,
+                                                                                                         line_ped_y_mean,
+                                                                                                         ped_id=p,
+                                                                                                         scene_id=scene_id,
+                                                                                                         frame_id=i)
+
         ax = plt.plot(line_ped_x, line_ped_y)
-        ax = plt.plot(line_ped_x_in, line_ped_y_in, linewidth=3, linestyle=":")
-        ax = plt.plot(line_ped_x_mean, line_ped_y_mean, linewidth=3, linestyle="--")
+        ax = plt.plot(line_ped_x_in, line_ped_y_in, linewidth=3)
+        ax = plt.plot(line_ped_x_mean, line_ped_y_mean, linewidth=3)
 
     ax[0].axes.set_aspect('equal')
     plt.title([args.ndjson.split('/')[-1], "scene_id", scene_id])
