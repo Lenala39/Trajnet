@@ -8,7 +8,6 @@ import numpy as np
 import copy
 from statistics import mean
 
-
 TrackRow = namedtuple('Row', ['frame', 'pedestrian', 'x', 'y', 'prediction_number', 'scene_id'])
 TrackRow.__new__.__defaults__ = (None, None, None, None, None, None)
 SceneRow = namedtuple('Row', ['scene', 'pedestrian', 'start', 'end', 'fps', 'tag'])
@@ -16,6 +15,7 @@ GridPoint = namedtuple('Point', ['frame', 'pedestrian', 'x', 'y', 'pre_x', 'pre_
                                  'next_x', 'next_y', 'prediction_number', 'scene_id'])
 GridPoint.__new__.__defaults__ = (None, None, None, None, None, None, None, None, None, None)
 distance_threshold = 0.6
+
 
 class Indexer(object):
     """Read trajnet files and put tracks into grid
@@ -64,7 +64,7 @@ class Indexer(object):
 
                 scene = line.get('scene')
                 if scene is not None:
-                    self.scene_frames_start_end[scene['id']]=[scene['s'], scene['e']]
+                    self.scene_frames_start_end[scene['id']] = [scene['s'], scene['e']]
                     row = SceneRow(scene['id'], scene['p'], scene['s'], scene['e'], \
                                    scene['fps'], scene['tag'])
                     for i in range(row.start, row.end + 1):
@@ -155,7 +155,8 @@ class Indexer(object):
         all_frames_by_scene_id = []
         unique_pedestrians = []
         for i in range(len(self.tracks)):
-            if self.tracks[i].frame >= self.scene_frames_start_end[scene_id][0] and self.tracks[i].frame <= self.scene_frames_start_end[scene_id][1]:
+            if self.tracks[i].frame >= self.scene_frames_start_end[scene_id][0] and self.tracks[i].frame <= \
+                    self.scene_frames_start_end[scene_id][1]:
                 all_frames_by_scene_id.append(self.tracks[i])
                 unique_pedestrians.append(self.tracks[i].pedestrian)
         unique_pedestrians = list(set(unique_pedestrians))
@@ -185,21 +186,23 @@ class Indexer(object):
                     fr = f.frame  # scene data
             for i, f in enumerate(ped_traj):  # find common frame in the ped traj data
                 if f.x == x and f.y == y:
-                    index_frame = fr-i
+                    index_frame = fr - i
             for i in range(len(ped_traj)):
                 ped_traj[i] = copy.deepcopy(ped_traj[i]._replace(frame=index_frame))
                 index_frame += 1
             for i, f in enumerate(ped_traj):
                 if f.frame in list(scene_prediction_datastracture[p].keys()):
-                    if f.x == scene_prediction_datastracture[p][f.frame].x and f.y == scene_prediction_datastracture[p][f.frame].y:
+                    if f.x == scene_prediction_datastracture[p][f.frame].x and f.y == scene_prediction_datastracture[p][
+                        f.frame].y:
                         pass
                     else:
-                        print('error')
+                        print('ERROR: X, Y values for pedestrian don\'t match X/Y values for frame')
                 else:
                     scene_prediction_datastracture[p][f.frame] = f
         return scene_prediction_datastracture
 
-    def predict_mean_movement(self, line_ped_x, line_ped_y, line_ped_x_mean, line_ped_y_mean, frame_id, ped_id, scene_id):
+    def predict_mean_movement(self, line_ped_x, line_ped_y, line_ped_x_mean, line_ped_y_mean, frame_id, ped_id,
+                              scene_id, collision_x, collision_y):
         """
         Computes the average movement from the previous steps and predicts one more step based on that
         returns: newly computed lines (with appended step if no collision)
@@ -236,9 +239,10 @@ class Indexer(object):
             new_track = TrackRow(frame_id, ped_id, next_step_x, next_step_y, None, scene_id)
             self.extend_grid(track=new_track, pre_x=last_step_x, pre_y=last_step_y)
         else:
-            pass
+            collision_x.append(next_step_x)
+            collision_y.append(next_step_y)
 
-        return line_ped_x, line_ped_y, line_ped_x_mean, line_ped_y_mean
+        return line_ped_x, line_ped_y, line_ped_x_mean, line_ped_y_mean, collision_x, collision_y
 
     def extend_grid(self, track, pre_x, pre_y):
         """
@@ -249,60 +253,58 @@ class Indexer(object):
                           track.prediction_number, track.scene_id)
         self.grid[self.convert_x(point.x)][self.convert_y(point.y)].append(point)
 
-    def backtracking(self, line_ped_x, line_ped_y, line_ped_x_in, line_ped_y_in):
-        computed_steps = len(line_ped_x) - len(line_ped_x_in)
-
-        if computed_steps == 0:
-            return None
-
-        backtracking_steps = computed_steps if computed_steps <= 5 else 5
-
-        backtracking_line_x = line_ped_x[0:len(line_ped_x)-backtracking_steps]
-        backtracking_line_y = line_ped_y[0:len(line_ped_y)-backtracking_steps]
-
 
 def check_distance(pedestrian):
     new_pedestrian = copy.deepcopy(pedestrian)
-    #for each frame
+    # for each frame
     for frame in range(len(pedestrian[0][0])):
-    #for each pedestrian
+        # for each pedestrian
         for ped in range(len(pedestrian)):
-            #for other pedestrians
+            # for other pedestrians
             for ped_compare in range(len(pedestrian)):
                 if ped != ped_compare:
-                    #check for distance
-                    distance = calculate_distance(pedestrian[ped][0][frame], pedestrian[ped][1][frame], pedestrian[ped_compare][0][frame], pedestrian[ped_compare][1][frame])
+                    # check for distance
+                    distance = calculate_distance(pedestrian[ped][0][frame], pedestrian[ped][1][frame],
+                                                  pedestrian[ped_compare][0][frame], pedestrian[ped_compare][1][frame])
                     if distance < distance_threshold:
-                        #movement vector for pedestrian
-                        vector_ped_x = pedestrian[ped][0][frame] - pedestrian[ped][0][frame-1]
+                        # movement vector for pedestrian
+                        vector_ped_x = pedestrian[ped][0][frame] - pedestrian[ped][0][frame - 1]
                         vector_ped_y = pedestrian[ped][1][frame] - pedestrian[ped][1][frame - 1]
 
-                        #collision avoidance vector
+                        # collision avoidance vector
                         vector_ped_compare_x = new_pedestrian[ped][0][frame] - new_pedestrian[ped_compare][0][frame]
                         vector_ped_compare_y = new_pedestrian[ped][1][frame] - new_pedestrian[ped_compare][1][frame]
 
-                        #norm, maybe weight with distance?
-                        vector_ped_compare_x /= distance*2
-                        vector_ped_compare_y /= distance*2
+                        # compute weight for avoidance maneuver
+                        weight = 1 - ((distance - 0.0) / (distance_threshold - 0.0))
+                        print("Weight:", weight)
+                        print("Distance", distance)
 
-                        #new position = position before + movement vector + collision avoidance vector
-                        new_pedestrian[ped][0][frame] = new_pedestrian[ped][0][frame-1] + vector_ped_x + vector_ped_compare_x
-                        new_pedestrian[ped][1][frame] = new_pedestrian[ped][1][frame-1] + vector_ped_y + vector_ped_compare_y
+                        # norm, maybe weight with distance?
+                        vector_ped_compare_x /= distance * 2
+                        vector_ped_compare_y /= distance * 2
 
-                        print('frame #' + str(frame))
-                        print('ped #' + str(ped))
-                        print('ped_compare #' + str(ped_compare))
-                        print(str(pedestrian[ped][0][frame]) + '; ' + str(pedestrian[ped][1][frame]))
-                        print(str(pedestrian[ped_compare][0][frame]) + '; ' + str(pedestrian[ped_compare][1][frame]))
-                        print(str(distance))
+                        # new position = position before + movement vector + collision avoidance vector
+                        new_pedestrian[ped][0][frame] = new_pedestrian[ped][0][frame - 1] + vector_ped_x + (
+                                    vector_ped_compare_x * weight)
+                        new_pedestrian[ped][1][frame] = new_pedestrian[ped][1][frame - 1] + vector_ped_y + (
+                                    vector_ped_compare_y * weight)
+
+                        # print('frame #' + str(frame))
+                        # print('ped #' + str(ped))
+                        # print('ped_compare #' + str(ped_compare))
+                        # print(str(pedestrian[ped][0][frame]) + '; ' + str(pedestrian[ped][1][frame]))
+                        # print(str(pedestrian[ped_compare][0][frame]) + '; ' + str(pedestrian[ped_compare][1][frame]))
+                        # print(str(distance))
 
     return new_pedestrian
 
 
 def calculate_distance(point_1_x, point_1_y, point_2_x, point_2_y):
-    return math.sqrt(math.pow(point_1_x-point_2_x, 2) + math.pow(point_1_y-point_2_y, 2))
+    return math.sqrt(math.pow(point_1_x - point_2_x, 2) + math.pow(point_1_y - point_2_y, 2))
 
-#def norm_vec(vec_x, vec_y):
+
+# def norm_vec(vec_x, vec_y):
 #    return math.sqrt(math.pow(vec_x,2) + math.pow(vec_y,2))
 
 def main():
@@ -350,8 +352,10 @@ def main():
         line_ped_y_in = []
         line_ped_x_mean = []
         line_ped_y_mean = []
+        collision_x = []
+        collision_y = []
         # iterate over all frames that the scene has
-        for i in range(indexer.scene_frames_start_end[scene_id][0], indexer.scene_frames_start_end[scene_id][1]+1):
+        for i in range(indexer.scene_frames_start_end[scene_id][0], indexer.scene_frames_start_end[scene_id][1] + 1):
             try:
                 # append the values found in the database
                 line_ped_x.append(scene_prediction_datastracture[p][i].x)
@@ -361,28 +365,27 @@ def main():
                     line_ped_x_in.append(scene_prediction_datastracture[p][i].x)
                     line_ped_y_in.append(scene_prediction_datastracture[p][i].y)
             except:  # no database entries found
-
+                # assert len(line_ped_x) > 0
                 # try to predict the movement by taking mean movement of pedestrian before
-                line_ped_x, line_ped_y, line_ped_x_mean, line_ped_y_mean = indexer.predict_mean_movement(line_ped_x,
-                                                                                                         line_ped_y,
-                                                                                                         line_ped_x_mean,
-                                                                                                         line_ped_y_mean,
-                                                                                                         ped_id=p,
-                                                                                                         scene_id=scene_id,
-                                                                                                         frame_id=i)
-        pedestrians.append([line_ped_x, line_ped_y])
-        #ax = plt.plot(line_ped_x, line_ped_y)
-        #ax = plt.plot(line_ped_x, line_ped_y)
-        #ax = plt.plot(line_ped_x_in, line_ped_y_in, linewidth=3)
-        #ax = plt.plot(line_ped_x_mean, line_ped_y_mean, linewidth=3)
-    old_pedestrians = copy.deepcopy(pedestrians)
-    new_pedestrians = check_distance(pedestrians)
-    for i in range(len(new_pedestrians)):
-        if new_pedestrians[i] != old_pedestrians[i]:
-            ax = plt.plot(new_pedestrians[i][0], new_pedestrians[i][1])
-            ax = plt.plot(old_pedestrians[i][0], old_pedestrians[i][1], linestyle=":")
+                line_ped_x, line_ped_y, line_ped_x_mean, line_ped_y_mean, \
+                    collision_x, collision_y = indexer.predict_mean_movement(line_ped_x, line_ped_y, line_ped_x_mean,
+                                                                    line_ped_y_mean, ped_id=p, scene_id=scene_id,
+                                                                    frame_id=i, collision_x=collision_x,
+                                                                    collision_y=collision_y)
 
-    #ax[0].axes.set_aspect('equal')
+        pedestrians.append([line_ped_x, line_ped_y])
+        collisions.append([collision_x, collision_y])
+
+    # compute the avoidance paths
+    new_pedestrians = check_distance(pedestrians)
+    # plot the pedestrians
+    for i in range(len(new_pedestrians)):
+        #if new_pedestrians[i] != pedestrians[i]:
+        ax = plt.plot(new_pedestrians[i][0], new_pedestrians[i][1])
+        ax = plt.plot(pedestrians[i][0], pedestrians[i][1], linestyle=":")
+        plt.scatter(collisions[i][0], collisions[i][1])
+
+    # ax[0].axes.set_aspect('equal')
     plt.title([args.ndjson.split('/')[-1], "scene_id", scene_id])
     plt.savefig('collision_avoidance.png')
     plt.show()
