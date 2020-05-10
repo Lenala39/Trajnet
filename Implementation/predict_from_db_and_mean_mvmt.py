@@ -261,32 +261,47 @@ class Indexer(object):
         backtracking_line_y = line_ped_y[0:len(line_ped_y)-backtracking_steps]
 
 def check_distance(pedestrian):
-    new_pedestrian = pedestrian
+    new_pedestrian = copy.deepcopy(pedestrian)
+    #for each frame
     for frame in range(len(pedestrian[0][0])):
+    #for each pedestrian
         for ped in range(len(pedestrian)):
+            #for other pedestrians
             for ped_compare in range(len(pedestrian)):
                 if ped != ped_compare:
-                    if calculate_distance(pedestrian[ped][0][frame], pedestrian[ped][1][frame], pedestrian[ped_compare][0][frame], pedestrian[ped_compare][1][frame]) < distance_threshold:
+                    #check for distance
+                    distance = calculate_distance(pedestrian[ped][0][frame], pedestrian[ped][1][frame], pedestrian[ped_compare][0][frame], pedestrian[ped_compare][1][frame])
+                    if distance < distance_threshold:
+                        #movement vector for pedestrian
                         vector_ped_x = pedestrian[ped][0][frame] - pedestrian[ped][0][frame-1]
-                        vector_ped_compare_x = pedestrian[ped_compare][0][frame] - pedestrian[ped_compare][0][frame-1]
                         vector_ped_y = pedestrian[ped][1][frame] - pedestrian[ped][1][frame - 1]
-                        vector_ped_compare_y = pedestrian[ped_compare][1][frame] - pedestrian[ped_compare][1][frame - 1]
-                        new_pedestrian[ped][0][frame] = new_pedestrian[ped][0][frame-1] + (vector_ped_x - vector_ped_compare_x)
-                        new_pedestrian[ped][1][frame] = new_pedestrian[ped][1][frame-1] + (vector_ped_y - vector_ped_compare_y)
+
+                        #collision avoidance vector
+                        vector_ped_compare_x = new_pedestrian[ped][0][frame] - new_pedestrian[ped_compare][0][frame]
+                        vector_ped_compare_y = new_pedestrian[ped][1][frame] - new_pedestrian[ped_compare][1][frame]
+
+                        #norm, maybe weight with distance?
+                        vector_ped_compare_x /= distance*2
+                        vector_ped_compare_y /= distance*2
+
+                        #new position = position before + movement vector + collision avoidance vector
+                        new_pedestrian[ped][0][frame] = new_pedestrian[ped][0][frame-1] + vector_ped_x + vector_ped_compare_x
+                        new_pedestrian[ped][1][frame] = new_pedestrian[ped][1][frame-1] + vector_ped_y + vector_ped_compare_y
 
                         print('frame #' + str(frame))
                         print('ped #' + str(ped))
                         print('ped_compare #' + str(ped_compare))
                         print(str(pedestrian[ped][0][frame]) + '; ' + str(pedestrian[ped][1][frame]))
                         print(str(pedestrian[ped_compare][0][frame]) + '; ' + str(pedestrian[ped_compare][1][frame]))
-
-                        print(str(calculate_distance(pedestrian[ped][0][frame], pedestrian[ped][1][frame], pedestrian[ped_compare][0][frame], pedestrian[ped_compare][1][frame])))
+                        print(str(distance))
 
     return new_pedestrian
 
 def calculate_distance(point_1_x, point_1_y, point_2_x, point_2_y):
     return math.sqrt(math.pow(point_1_x-point_2_x, 2) + math.pow(point_1_y-point_2_y, 2))
 
+#def norm_vec(vec_x, vec_y):
+#    return math.sqrt(math.pow(vec_x,2) + math.pow(vec_y,2))
 
 def main():
     parser = argparse.ArgumentParser()
@@ -361,9 +376,10 @@ def main():
     new_pedestrians = check_distance(pedestrians)
     for ped in new_pedestrians:
         ax = plt.plot(ped[0], ped[1])
+
     ax[0].axes.set_aspect('equal')
     plt.title([args.ndjson.split('/')[-1], "scene_id", scene_id])
-    #plt.savefig('new.png')
+    plt.savefig('collision_avoidance.png')
     plt.show()
 
     print('DONE')
