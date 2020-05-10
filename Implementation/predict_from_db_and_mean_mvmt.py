@@ -264,12 +264,12 @@ def check_distance(pedestrian):
             for ped_compare in range(len(pedestrian)):
                 if ped != ped_compare:
                     # check for distance
-                    distance = calculate_distance(pedestrian[ped][0][frame], pedestrian[ped][1][frame],
-                                                  pedestrian[ped_compare][0][frame], pedestrian[ped_compare][1][frame])
+                    distance = calculate_distance(new_pedestrian[ped][0][frame], new_pedestrian[ped][1][frame],
+                                                  new_pedestrian[ped_compare][0][frame], new_pedestrian[ped_compare][1][frame])
                     if distance < distance_threshold:
-                        # movement vector for pedestrian
-                        vector_ped_x = pedestrian[ped][0][frame] - pedestrian[ped][0][frame - 1]
-                        vector_ped_y = pedestrian[ped][1][frame] - pedestrian[ped][1][frame - 1]
+                        # movement vector for new_pedestrian
+                        vector_ped_x = new_pedestrian[ped][0][frame] - new_pedestrian[ped][0][frame - 1]
+                        vector_ped_y = new_pedestrian[ped][1][frame] - new_pedestrian[ped][1][frame - 1]
 
                         # collision avoidance vector
                         vector_ped_compare_x = new_pedestrian[ped][0][frame] - new_pedestrian[ped_compare][0][frame]
