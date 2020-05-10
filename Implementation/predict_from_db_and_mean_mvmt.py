@@ -260,6 +260,7 @@ class Indexer(object):
         backtracking_line_x = line_ped_x[0:len(line_ped_x)-backtracking_steps]
         backtracking_line_y = line_ped_y[0:len(line_ped_y)-backtracking_steps]
 
+
 def check_distance(pedestrian):
     new_pedestrian = pedestrian
     for frame in range(len(pedestrian[0][0])):
@@ -283,6 +284,7 @@ def check_distance(pedestrian):
                         print(str(calculate_distance(pedestrian[ped][0][frame], pedestrian[ped][1][frame], pedestrian[ped_compare][0][frame], pedestrian[ped_compare][1][frame])))
 
     return new_pedestrian
+
 
 def calculate_distance(point_1_x, point_1_y, point_2_x, point_2_y):
     return math.sqrt(math.pow(point_1_x-point_2_x, 2) + math.pow(point_1_y-point_2_y, 2))
@@ -324,6 +326,7 @@ def main():
     #     ax = plt.plot([p.x for p in all_ped_frames], [p.y for p in all_ped_frames], '*')
     print(scene_prediction_datastracture.keys())
     pedestrians = []
+    collisions = []
     for p in scene_prediction_datastracture.keys():
 
         line_ped_x = []
@@ -357,11 +360,14 @@ def main():
         #ax = plt.plot(line_ped_x, line_ped_y)
         #ax = plt.plot(line_ped_x_in, line_ped_y_in, linewidth=3)
         #ax = plt.plot(line_ped_x_mean, line_ped_y_mean, linewidth=3)
-
+    old_pedestrians = copy.deepcopy(pedestrians)
     new_pedestrians = check_distance(pedestrians)
-    for ped in new_pedestrians:
-        ax = plt.plot(ped[0], ped[1])
-    ax[0].axes.set_aspect('equal')
+    for i in range(len(new_pedestrians)):
+        if new_pedestrians[i] != old_pedestrians[i]:
+            ax = plt.plot(new_pedestrians[i][0], new_pedestrians[i][1])
+            ax = plt.plot(old_pedestrians[i][0], old_pedestrians[i][1], linestyle=":")
+
+    #ax[0].axes.set_aspect('equal')
     plt.title([args.ndjson.split('/')[-1], "scene_id", scene_id])
     #plt.savefig('new.png')
     plt.show()
