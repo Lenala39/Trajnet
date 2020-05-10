@@ -1,4 +1,4 @@
-from Implementation import collision
+import collision
 
 import math
 import json
@@ -15,7 +15,7 @@ SceneRow = namedtuple('Row', ['scene', 'pedestrian', 'start', 'end', 'fps', 'tag
 GridPoint = namedtuple('Point', ['frame', 'pedestrian', 'x', 'y', 'pre_x', 'pre_y',
                                  'next_x', 'next_y', 'prediction_number', 'scene_id'])
 GridPoint.__new__.__defaults__ = (None, None, None, None, None, None, None, None, None, None)
-
+distance_threshold = 0.6
 
 class Indexer(object):
     """Read trajnet files and put tracks into grid
@@ -260,6 +260,33 @@ class Indexer(object):
         backtracking_line_x = line_ped_x[0:len(line_ped_x)-backtracking_steps]
         backtracking_line_y = line_ped_y[0:len(line_ped_y)-backtracking_steps]
 
+def check_distance(pedestrian):
+    new_pedestrian = pedestrian
+    for frame in range(len(pedestrian[0][0])):
+        for ped in range(len(pedestrian)):
+            for ped_compare in range(len(pedestrian)):
+                if ped != ped_compare:
+                    if calculate_distance(pedestrian[ped][0][frame], pedestrian[ped][1][frame], pedestrian[ped_compare][0][frame], pedestrian[ped_compare][1][frame]) < distance_threshold:
+                        vector_ped_x = pedestrian[ped][0][frame] - pedestrian[ped][0][frame-1]
+                        vector_ped_compare_x = pedestrian[ped_compare][0][frame] - pedestrian[ped_compare][0][frame-1]
+                        vector_ped_y = pedestrian[ped][1][frame] - pedestrian[ped][1][frame - 1]
+                        vector_ped_compare_y = pedestrian[ped_compare][1][frame] - pedestrian[ped_compare][1][frame - 1]
+                        new_pedestrian[ped][0][frame] = new_pedestrian[ped][0][frame-1] + (vector_ped_x - vector_ped_compare_x)
+                        new_pedestrian[ped][1][frame] = new_pedestrian[ped][1][frame-1] + (vector_ped_y - vector_ped_compare_y)
+
+                        print('frame #' + str(frame))
+                        print('ped #' + str(ped))
+                        print('ped_compare #' + str(ped_compare))
+                        print(str(pedestrian[ped][0][frame]) + '; ' + str(pedestrian[ped][1][frame]))
+                        print(str(pedestrian[ped_compare][0][frame]) + '; ' + str(pedestrian[ped_compare][1][frame]))
+
+                        print(str(calculate_distance(pedestrian[ped][0][frame], pedestrian[ped][1][frame], pedestrian[ped_compare][0][frame], pedestrian[ped_compare][1][frame])))
+
+    return new_pedestrian
+
+def calculate_distance(point_1_x, point_1_y, point_2_x, point_2_y):
+    return math.sqrt(math.pow(point_1_x-point_2_x, 2) + math.pow(point_1_y-point_2_y, 2))
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -296,6 +323,7 @@ def main():
     #     ped_traj = indexer.get_ped_traj(all_ped_frames, ped)
     #     ax = plt.plot([p.x for p in all_ped_frames], [p.y for p in all_ped_frames], '*')
     print(scene_prediction_datastracture.keys())
+    pedestrians = []
     for p in scene_prediction_datastracture.keys():
 
         line_ped_x = []
@@ -324,13 +352,18 @@ def main():
                                                                                                          ped_id=p,
                                                                                                          scene_id=scene_id,
                                                                                                          frame_id=i)
+        pedestrians.append([line_ped_x, line_ped_y])
+        #ax = plt.plot(line_ped_x, line_ped_y)
+        #ax = plt.plot(line_ped_x, line_ped_y)
+        #ax = plt.plot(line_ped_x_in, line_ped_y_in, linewidth=3)
+        #ax = plt.plot(line_ped_x_mean, line_ped_y_mean, linewidth=3)
 
-        ax = plt.plot(line_ped_x, line_ped_y)
-        ax = plt.plot(line_ped_x_in, line_ped_y_in, linewidth=3)
-        ax = plt.plot(line_ped_x_mean, line_ped_y_mean, linewidth=3)
-
+    new_pedestrians = check_distance(pedestrians)
+    for ped in new_pedestrians:
+        ax = plt.plot(ped[0], ped[1])
     ax[0].axes.set_aspect('equal')
     plt.title([args.ndjson.split('/')[-1], "scene_id", scene_id])
+    #plt.savefig('new.png')
     plt.show()
 
     print('DONE')
