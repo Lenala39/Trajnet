@@ -68,8 +68,8 @@ class Pathfinder():
         return peds_in_radius
 
 
-    # TODO
     # TODO find out how many steps there are in the future
+    # TODO if previous coordinates for direction calculation do not exist
     def get_path(self):
         """
         Finds the most suitable candidate according to a loss function from which the steps are copied
@@ -101,15 +101,25 @@ class Pathfinder():
 
             # for every final candidate calculate the loss over all timesteps
             for ped in candidates_final:
-                loss = 0
+                loss_sum = 0
                 ped_history = get_history(ped, self.indexer)
                 index_of_current_timestep = np.argwhere(ped_history == [ped.x, ped.y])
+                losses_final = []
+                # sum up loss of candidate over every timestep
                 for i in range(index_of_current_timestep, index_of_current_timestep+self.timesteps):
-                    loss = loss + self.calculate_loss(i, get_history(ped.x, ped.y, ped.pre_x, ped.pre_y), ped_history[i,0], ped_history[i,1],
+                    loss = self.calculate_loss(i, get_history(ped.x, ped.y, ped.pre_x, ped.pre_y), ped_history[i,0], ped_history[i,1],
                                                      get_direction(ped_history[i,0], ped_history[i,1], ped_history[i+1,0], ped_history[i+1,1]))
-                
+                    if loss is not None:
+                        loss_sum = loss_sum + loss
+                losses_final.append(loss_sum)
 
+            # find candidate with smallest loss
+            index_winner = np.argmin(np.array(losses_final))
+            winner = candidates_final[index_winner]
+            winner_history = get_history(winner, self.indexer)
+            print("winner_history: ", winner_history)
 
+            return winner_history[:np.argwhere(winner_history == [winner.x, winner.y])][::-1]
         else:
             return None
 
