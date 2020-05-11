@@ -49,14 +49,14 @@ class Collision():
                 line2 = (track[1], track[0])
                 collide, intersection_point = self.line_intersection(line2, new_line)
             except IndexError:
-                collide = False
+                collide = False, intersection_point
 
             if collide:
-                return True
+                return True, intersection_point
             else:
                 continue
 
-        return False
+        return False, (None, None)
 
     def line_intersection(self, existing_line, new_line):
         """"
