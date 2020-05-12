@@ -1,8 +1,5 @@
-import collision
-import pathfinder
-
-import dill
 import math
+import dill
 import json
 import argparse
 from collections import defaultdict, namedtuple
@@ -247,189 +244,21 @@ class Indexer(object):
         self.grid[self.convert_x(point.x)][self.convert_y(point.y)].append(point)
 
 
-def check_distance(pedestrian):
-    min_distance = 1000000
-    new_pedestrian = copy.deepcopy(pedestrian)
-    # for each frame
-    for frame in range(len(pedestrian[0][0])):
-        # for each pedestrian
-        for ped in range(len(pedestrian)):
-            # for other pedestrians
-            for ped_compare in range(len(pedestrian)):
-                if ped != ped_compare:
-                    # check for distance
-                    distance = calculate_distance(new_pedestrian[ped][0][frame], new_pedestrian[ped][1][frame],
-                                                  new_pedestrian[ped_compare][0][frame], new_pedestrian[ped_compare][1][frame])
-                    if distance < min_distance:
-                        min_distance = distance
-                    if distance < distance_threshold:
-                        # movement vector for new_pedestrian
-                        vector_ped_x = new_pedestrian[ped][0][frame] - new_pedestrian[ped][0][frame - 1]
-                        vector_ped_y = new_pedestrian[ped][1][frame] - new_pedestrian[ped][1][frame - 1]
-
-                        # collision avoidance vector
-                        vector_ped_compare_x = new_pedestrian[ped][0][frame] - new_pedestrian[ped_compare][0][frame]
-                        vector_ped_compare_y = new_pedestrian[ped][1][frame] - new_pedestrian[ped_compare][1][frame]
-
-                        # compute weight for avoidance maneuver
-                        weight = 1 - ((distance - 0.0) / (distance_threshold - 0.0))
-                        #print("Weight:", weight)
-                        #print("Distance", distance)
-
-                        # norm
-                        vector_ped_compare_x /= distance * 2
-                        vector_ped_compare_y /= distance * 2
-
-                        # new position = position before + movement vector + collision avoidance vector
-                        new_pedestrian[ped][0][frame] = pedestrian[ped][0][frame - 1] + vector_ped_x + (
-                                    vector_ped_compare_x * weight)
-                        new_pedestrian[ped][1][frame] = pedestrian[ped][1][frame - 1] + vector_ped_y + (
-                                    vector_ped_compare_y * weight)
-
-                        # print('frame #' + str(frame))
-                        # print('ped #' + str(ped))
-                        # print('ped_compare #' + str(ped_compare))
-                        # print(str(pedestrian[ped][0][frame]) + '; ' + str(pedestrian[ped][1][frame]))
-                        # print(str(pedestrian[ped_compare][0][frame]) + '; ' + str(pedestrian[ped_compare][1][frame]))
-                        # print(str(distance))
-
-    print("Min distance:" , min_distance)
-    return new_pedestrian
-
-
-def calculate_distance(point_1_x, point_1_y, point_2_x, point_2_y):
-    return math.sqrt(math.pow(point_2_x - point_1_x, 2) + math.pow(point_2_y - point_1_y, 2))
-
-
-# def norm_vec(vec_x, vec_y):
-#    return math.sqrt(math.pow(vec_x,2) + math.pow(vec_y,2))
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--ndjson', help='trajnet dataset file')
-    parser.add_argument('--load', default=False, help='deserialize dataset file')
     parser.add_argument('--n', type=int, default=100, help='grid dimension n x n')
-    parser.add_argument('--scene_id', type=int, default=2396, help="scene you want to look at")
     args = parser.parse_args()
+
     print(args.ndjson)
-
-    # deserialization
-    if args.load:
-        indexer = dill.load(open(str(args.ndjson.split("/")[-1]).replace(".ndjson", "") + ".p", "rb"))
-    else:
-        indexer = Indexer(args.ndjson, args.n)
+    indexer = Indexer(args.ndjson, args.n)
     grid = indexer.get_grid()
-    '''print([indexer.x_max, indexer.x_min, indexer.y_max, indexer.y_min])
-    for p in indexer.get_frames_at_xy(indexer.tracks[5].x, indexer.tracks[5].y):
-        print(p)'''
 
-    scene_id = args.scene_id
-    all_frames_by_scene_id, unique_pedestrians = indexer.get_all_frames_by_scene_id(scene_id)
+    # serialization
+    dill.dump(indexer, open(str(args.ndjson.split("/")[-1]).replace(".ndjson", "") + ".p", "wb"))
 
-    scene_prediction_datastracture = indexer.get_scene_prediction_datastracture(all_frames_by_scene_id)
-
-    # scene_ped_curves = {}
-    # for ped in unique_pedestrians:
-    #     all_ped_frames = indexer.get_all_frames_by_ped_id(ped)
-    #     ped_traj = indexer.get_ped_traj(all_ped_frames, ped)
-    #     scene_ped_curves[ped] = ped_traj
-    # for i in scene_ped_curves.keys():
-    #     ax = plt.plot([p.x for p in scene_ped_curves[i]], [p.y for p in scene_ped_curves[i]], '*')
-
-    # matplotlib.use('MacOSX')
-    import matplotlib.pyplot as plt
-
-    # for ped in range(10):
-    #     all_ped_frames = indexer.get_all_frames_by_ped_id(ped)
-    #     ped_traj = indexer.get_ped_traj(all_ped_frames, ped)
-    #     ax = plt.plot([p.x for p in all_ped_frames], [p.y for p in all_ped_frames], '*')
-    print(scene_prediction_datastracture.keys())
-    pedestrians = []
-    collisions = []
-    input_line = []
-    for p in scene_prediction_datastracture.keys():
-
-        line_ped_x = []
-        line_ped_y = []
-        line_ped_x_in = []
-        line_ped_y_in = []
-        line_ped_x_mean = []
-        line_ped_y_mean = []
-        collision_x = []
-        collision_y = []
-        # iterate over all frames that the scene has
-        for i in range(indexer.scene_frames_start_end[scene_id][0], indexer.scene_frames_start_end[scene_id][1] + 1):
-            try:
-                if i < 9 + indexer.scene_frames_start_end[scene_id][0]:
-                    # append the values found in the database
-                    print("Frame: ", scene_prediction_datastracture[p][i].frame)
-                    print("X Value: ", scene_prediction_datastracture[p][i].x)
-                    line_ped_x.append(scene_prediction_datastracture[p][i].x)
-                    line_ped_y.append(scene_prediction_datastracture[p][i].y)
-                    line_ped_x_in.append(scene_prediction_datastracture[p][i].x)
-                    line_ped_y_in.append(scene_prediction_datastracture[p][i].y)
-                else:
-                    line_ped_x, line_ped_y, line_ped_x_mean, line_ped_y_mean, \
-                    collision_x, collision_y = indexer.predict_mean_movement(line_ped_x, line_ped_y, line_ped_x_mean,
-                                                                             line_ped_y_mean, ped_id=p,
-                                                                             scene_id=scene_id,
-                                                                             frame_id=i, collision_x=collision_x,
-                                                                             collision_y=collision_y)
-            except:  # no database entries found
-
-# TODO added pathfinder
-
-                # from the last valid frame compute the path
-                pathfinder_object = pathfinder.Pathfinder(scene_prediction_datastracture[p][i - 1], indexer)
-                path_prediction = pathfinder_object.get_path()
-                # TODO this has all possible future coordinates of winner pedestrian, need to filter the needed ones
-                # TODO and handle if we stil need more
-                if not None:
-                    print("Pathfinder path: ", path_prediction)
-                else:
-                    # pathfinder function could not find a suitable path to copy, do something else
-                    pass
-
-# TODO added pathfinder
-
-                # try to predict the movement by taking mean movement of pedestrian before
-                line_ped_x, line_ped_y, line_ped_x_mean, line_ped_y_mean = indexer.predict_mean_movement(line_ped_x,
-                                                                    line_ped_y, line_ped_x_mean, line_ped_y_mean,
-                                                                    ped_id=p, scene_id=scene_id, frame_id=i)
-
-        pedestrians.append([line_ped_x, line_ped_y])
-        input_line.append([line_ped_x_in, line_ped_y_in])
-
-    # compute the avoidance paths
-    old_pedestrians = copy.deepcopy(pedestrians)
-    new_pedestrians = check_distance(pedestrians)
-    pedestrians == new_pedestrians
-    i = 2
-    while new_pedestrians != pedestrians or i >= 5:
-        pedestrians = copy.deepcopy(new_pedestrians)
-        new_pedestrians = check_distance(pedestrians)
-        print(f"Done >> Iteration {i}")
-        i += 1
-
-    #assert old_pedestrians != new_pedestrians
-    # plot the pedestrians
-    for i in range(len(new_pedestrians)):
-        #if new_pedestrians[i] != pedestrians[i]:
-        #ax = plt.plot(input_line[i][0], input_line[i][1], linewidth=3)
-        ax = plt.plot(new_pedestrians[i][0], new_pedestrians[i][1])
-        ax = plt.plot(old_pedestrians[i][0], old_pedestrians[i][1], linestyle="dashed")
-
-    # ax[0].axes.set_aspect('equal')
-    plt.title([args.ndjson.split('/')[-1], "scene_id", scene_id])
-    plt.savefig('collision_avoidance.png')
-    plt.show()
-
-    print('DONE')
-    # collect scene frames
-    # collect ped trajectories
-    # assign start in ped trajectories
-    # extend scene trajectories
-
+    #loaded_indexer = dill.load(open(str(args.ndjson.split("/")[-1]).replace(".ndjson", "") + ".p", "rb"))
 
 if __name__ == '__main__':
     main()
