@@ -380,7 +380,10 @@ def main():
 # TODO added pathfinder
 
                 # from the last valid frame compute the path
-                pathfinder_object = pathfinder.Pathfinder(scene_prediction_datastracture[p][i - 1], indexer)
+                # TODO indexer_for_prediction (can be the same as indexer from which the current position comes from)
+                # TODO can be loaded using serialization with dill
+                indexer_for_prediction = indexer
+                pathfinder_object = pathfinder.Pathfinder(scene_prediction_datastracture[p][i - 1], indexer, indexer_for_prediction)
                 path_prediction = pathfinder_object.get_path()
                 # TODO this has all possible future coordinates of winner pedestrian, need to filter the needed ones
                 # TODO and handle if we stil need more
