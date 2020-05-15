@@ -361,21 +361,51 @@ def main():
         # iterate over all frames that the scene has
         for i in range(indexer.scene_frames_start_end[scene_id][0], indexer.scene_frames_start_end[scene_id][1] + 1):
             try:
+                # get input steps
                 if i < 9 + indexer.scene_frames_start_end[scene_id][0]:
                     # append the values found in the database
-                    print("Frame: ", scene_prediction_datastracture[p][i].frame)
-                    print("X Value: ", scene_prediction_datastracture[p][i].x)
+                    #print("Frame: ", scene_prediction_datastracture[p][i].frame)
+                    #print("X Value: ", scene_prediction_datastracture[p][i].x)
                     line_ped_x.append(scene_prediction_datastracture[p][i].x)
                     line_ped_y.append(scene_prediction_datastracture[p][i].y)
                     line_ped_x_in.append(scene_prediction_datastracture[p][i].x)
                     line_ped_y_in.append(scene_prediction_datastracture[p][i].y)
+                # already computed enough steps
+                elif len(line_ped_x) > 20:
+                    break
                 else:
-                    line_ped_x, line_ped_y, line_ped_x_mean, line_ped_y_mean, \
-                    collision_x, collision_y = indexer.predict_mean_movement(line_ped_x, line_ped_y, line_ped_x_mean,
-                                                                             line_ped_y_mean, ped_id=p,
-                                                                             scene_id=scene_id,
-                                                                             frame_id=i, collision_x=collision_x,
-                                                                             collision_y=collision_y)
+
+                    found_steps = len(line_ped_x)
+
+                    # from the last valid frame compute the path
+                    # TODO indexer_for_prediction (can be the same as indexer from which the current position comes from)
+                    # TODO can be loaded using serialization with dill
+                    indexer_for_prediction = indexer
+                    pathfinder_object = pathfinder.Pathfinder(scene_prediction_datastracture[p][i - 1], indexer,
+                                                              indexer_for_prediction)
+                    path_prediction = pathfinder_object.get_path(found_steps)
+                    # TODO this has all possible future coordinates of winner pedestrian, need to filter the needed ones
+                    # TODO and handle if we stil need more
+                    if path_prediction:
+                        print("Pathfinder path: ", path_prediction)
+                        path_prediction_x = [elem[0] for elem in path_prediction]
+                        path_prediction_y = [elem[1] for elem in path_prediction]
+                        diff = 21 - len(path_prediction_x) - found_steps
+                        index_diff = -1 if diff >= 0 else diff
+                        line_ped_x.append(path_prediction_x[:index_diff])
+                        line_ped_y.append(path_prediction_y[:index_diff])
+                    else:
+                        # pathfinder function could not find a suitable path to copy, do something else
+                        print("pathfinder function could not find a suitable path to copy, do something else")
+                        line_ped_x, line_ped_y, line_ped_x_mean, line_ped_y_mean, \
+                        collision_x, collision_y = indexer.predict_mean_movement(line_ped_x, line_ped_y,
+                                                                                 line_ped_x_mean,
+                                                                                 line_ped_y_mean, ped_id=p,
+                                                                                 scene_id=scene_id,
+                                                                                 frame_id=i, collision_x=collision_x,
+                                                                                 collision_y=collision_y)
+
+
             except:  # no database entries found
 
                 # TODO added pathfinder
@@ -390,17 +420,23 @@ def main():
                 # TODO and handle if we stil need more
                 if path_prediction:
                     print("Pathfinder path: ", path_prediction)
+                    path_prediction_x = [elem[0] for elem in path_prediction]
+                    path_prediction_y = [elem[1] for elem in path_prediction]
+                    diff = 21 - len(path_prediction_x) - found_steps
+                    index_diff = -1 if diff >= 0 else diff
+                    line_ped_x.append(path_prediction_x[:index_diff])
+                    line_ped_y.append(path_prediction_y[:index_diff])
                 else:
                     # pathfinder function could not find a suitable path to copy, do something else
                     print("pathfinder function could not find a suitable path to copy, do something else")
                     pass
 
 
-
-                # try to predict the movement by taking mean movement of pedestrian before
-                line_ped_x, line_ped_y, line_ped_x_mean, line_ped_y_mean = indexer.predict_mean_movement(line_ped_x,
-                                                                    line_ped_y, line_ped_x_mean, line_ped_y_mean,
-                                                                    ped_id=p, scene_id=scene_id, frame_id=i)
+                if len(line_ped_x) < 21:
+                    # try to predict the movement by taking mean movement of pedestrian before
+                    line_ped_x, line_ped_y, line_ped_x_mean, line_ped_y_mean = indexer.predict_mean_movement(line_ped_x,
+                                                                        line_ped_y, line_ped_x_mean, line_ped_y_mean,
+                                                                        ped_id=p, scene_id=scene_id, frame_id=i)
 
         pedestrians.append([line_ped_x, line_ped_y])
         input_line.append([line_ped_x_in, line_ped_y_in])
