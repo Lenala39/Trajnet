@@ -25,12 +25,12 @@ class Pathfinder():
         self.indexer_db = indexer_db
         self.timesteps = 3
         self.radius = 1.5
-        self.alpha = [1, 2, 3] # the last entry lies furthest in the past
-        self.beta = [1, 2, 3]
+        self.alpha = list(range(1, self.timesteps+1)) # the last entry lies furthest in the past
+        self.beta = list(range(1, self.timesteps+1))
 
         tmp = get_history(current_position, indexer_current)
-        tmp = tmp[np.argwhere(tmp == [current_position.x, current_position.y]), :] # check: does that really start WITH current coordinates?
-
+        current_position_index = tmp.index([current_position.x, current_position.y])
+        tmp = tmp[tmp.index([current_position.x, current_position.y]):] # check: does that really start WITH current coordinates?
         self.history = tmp # the last entry lies furthest in the past
         self.destination = None
 
@@ -78,9 +78,10 @@ class Pathfinder():
 
 
     # TODO find out how many steps there are in the future?
-    def get_path(self):
+    def get_path(self, found_steps):
         """
         Finds the most suitable candidate according to a loss function from which the steps are copied
+        :param found_steps: int of how many steps have been found already
         :returns: list of all future x-y-coordinates of best candidate or None
         """
         print("current_position: ", self.current_position)
@@ -89,7 +90,8 @@ class Pathfinder():
         for t in range(self.timesteps):
             candidates_at_t = self.get_all_pedestrians_in_radius(t)
             print("peds_in_radius: ", candidates_at_t)
-            candidates.append(candidates_at_t) # len = self.timesteps
+            if not len(candidates_at_t) == 0:
+                candidates.append(candidates_at_t) # len = self.timesteps
 
         # if we have found candidates in every timestep in the past
         if len(candidates) == self.timesteps:

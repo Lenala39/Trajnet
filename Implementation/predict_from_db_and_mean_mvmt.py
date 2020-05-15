@@ -378,23 +378,24 @@ def main():
                                                                              collision_y=collision_y)
             except:  # no database entries found
 
-# TODO added pathfinder
-
+                # TODO added pathfinder
+                found_steps = len(line_ped_x)
                 # from the last valid frame compute the path
                 # TODO indexer_for_prediction (can be the same as indexer from which the current position comes from)
                 # TODO can be loaded using serialization with dill
                 indexer_for_prediction = indexer
                 pathfinder_object = pathfinder.Pathfinder(scene_prediction_datastracture[p][i - 1], indexer, indexer_for_prediction)
-                path_prediction = pathfinder_object.get_path()
+                path_prediction = pathfinder_object.get_path(found_steps)
                 # TODO this has all possible future coordinates of winner pedestrian, need to filter the needed ones
                 # TODO and handle if we stil need more
-                if not None:
+                if path_prediction:
                     print("Pathfinder path: ", path_prediction)
                 else:
                     # pathfinder function could not find a suitable path to copy, do something else
+                    print("pathfinder function could not find a suitable path to copy, do something else")
                     pass
 
-# TODO added pathfinder
+
 
                 # try to predict the movement by taking mean movement of pedestrian before
                 line_ped_x, line_ped_y, line_ped_x_mean, line_ped_y_mean = indexer.predict_mean_movement(line_ped_x,
