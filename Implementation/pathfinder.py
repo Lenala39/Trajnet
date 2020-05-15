@@ -142,9 +142,7 @@ class Pathfinder():
 
                         # return every future step of most suitable track starting with first prediction step
                         start_index = winner_history.index(list((winner.x, winner.y)))
-                        #return winner_history[:np.argwhere(winner_history == [winner.x, winner.y])][::-1]
-                        print(np.array(winner_history)[start_index:][::-1])
-                        return np.array(winner_history)[start_index:][::-1]
+                        return np.array(winner_history)[start_index:][::-1].tolist()
                     else:
                         return None
                 else:
