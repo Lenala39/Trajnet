@@ -307,15 +307,16 @@ def calculate_distance(point_1_x, point_1_y, point_2_x, point_2_y):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--ndjson', help='trajnet dataset file')
-    parser.add_argument('--load', default=False, help='deserialize dataset file')
+    parser.add_argument('--load', default=None, help='deserialize dataset file')
     parser.add_argument('--n', type=int, default=100, help='grid dimension n x n')
     parser.add_argument('--scene_id', type=int, default=2396, help="scene you want to look at")
     args = parser.parse_args()
     print(args.ndjson)
 
     # deserialization
-    if args.load:
-        indexer = dill.load(open(str(args.ndjson.split("/")[-1]).replace(".ndjson", "") + ".p", "rb"))
+    if args.load is not None:
+        indexer = Indexer(args.ndjson, args.n)
+        indexer_pred = dill.load(open(str(args.load.split("/")[-1]).replace(".ndjson", "") + ".p", "rb"))
     else:
         indexer = Indexer(args.ndjson, args.n)
     grid = indexer.get_grid()
