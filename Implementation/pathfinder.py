@@ -63,17 +63,19 @@ class Pathfinder():
         :param: t = current timestep in the past
         :returns: peds_in_radius as Points
         """
-        print(self.history)
         i = self.indexer_current.convert_x(self.history[t][0])
         j = self.indexer_current.convert_y(self.history[t][1])
         peds_in_radius = []
         grid = self.indexer_db.get_grid()
         # iterates current and, if existent, neighbouring grid cells
-        i = np.clip(i, self.indexer_db.x_min+1, self.indexer_db.x_max-1)
-        j = np.clip(j, self.indexer_db.y_min+1, self.indexer_db.y_max-1)
-        for point in grid[i-1:i+1][j-1:j+1]:
-            if point.next_x is not None and get_distance(self.history[t], [point.x, point.y]) < self.radius:
-                peds_in_radius.append(point)
+        i = np.clip(i, 1, self.indexer_db.grid_dim-1)
+        j = np.clip(j, 1, self.indexer_db.grid_dim-1)
+
+        for ii in range(i-1, i+1):
+            for jj in range(j-1, j+1):
+                for point in grid[ii][jj]:
+                    if point.next_x is not None and get_distance(self.history[t], [point.x, point.y]) < self.radius:
+                        peds_in_radius.append(point)
         return peds_in_radius
 
 
@@ -89,7 +91,6 @@ class Pathfinder():
         # for every timestep in the past (increasing t) collect all pedestrian points in a certain radius to current_position
         for t in range(self.timesteps):
             candidates_at_t = self.get_all_pedestrians_in_radius(t)
-            print("peds_in_radius: ", candidates_at_t)
             if not len(candidates_at_t) == 0:
                 candidates.append(candidates_at_t) # len = self.timesteps
 
@@ -101,7 +102,8 @@ class Pathfinder():
                 # check if ped id also present in all other timesteps
                 in_all_timesteps = []
                 for t in range(1, self.timesteps):
-                    point_same_ped_id, is_in_timestep = ped_is_in(ped, candidates[t])
+                    #print(print('candidates[t]: ', candidates[t]))
+                    is_in_timestep, point_same_ped_id = ped_is_in(ped, candidates[t])
                     in_all_timesteps.append(is_in_timestep)
                 # if present at every single timestep
                 in_all_timesteps = np.all(in_all_timesteps)
@@ -112,28 +114,41 @@ class Pathfinder():
 
             losses_final = []
             # for every final candidate calculate the summed loss over all timesteps
-            for ped in candidates_final:
-                loss_sum = 0
-                ped_history = get_history(ped, self.indexer_db) # we need all timesteps
-                index_of_current_timestep = np.argwhere(ped_history == [ped.x, ped.y]) # find right starting point in history
-                losses_final = []
-                # sum up loss of candidate over every timestep
-                # TODO if previous coordinates for direction calculation do not exist?
-                for i in range(index_of_current_timestep, index_of_current_timestep+self.timesteps):
-                    loss = self.calculate_loss(i, get_direction(ped.x, ped.y, ped.pre_x, ped.pre_y), ped_history[i,0], ped_history[i,1],
-                                               get_direction(ped_history[i,0], ped_history[i,1], ped_history[i+1,0], ped_history[i+1,1]))
-                    if loss is not None:
-                        loss_sum = loss_sum + loss
-                losses_final.append(loss_sum)
+            if candidates_final:
+                for ped in candidates_final:
+                    loss_sum = 0
+                    ped_history = get_history(ped, self.indexer_db) # we need all timesteps
 
-            # find candidate with smallest loss
-            index_winner = np.argmin(np.array(losses_final))
-            winner = candidates_final[index_winner[0]]
-            winner_history = get_history(winner, self.indexer_db)
-            print("winner_history: ", winner_history)
+                    #index_of_current_timestep = np.argwhere(ped_history == list([ped.x, ped.y])) # find right starting point in history
+                    index_of_current_timestep = ped_history.index(list([ped.x, ped.y]))
+                    # sum up loss of candidate over every timestep
+                    for i in range(index_of_current_timestep, index_of_current_timestep+self.timesteps):
+                        loss = self.calculate_loss(i-index_of_current_timestep, get_direction(ped.x, ped.y, ped.pre_x, ped.pre_y), ped_history[i][0], ped_history[i][1],
+                                                   get_direction(ped_history[i][0], ped_history[i][1], ped_history[i+1][0], ped_history[i+1][1]))
+                        #print("loss: ", loss)
+                        if loss is not None:
+                            loss_sum = loss_sum + loss
+                    losses_final.append(loss_sum)
 
-            # return every future step of most suitable track starting with first prediction step
-            return winner_history[:np.argwhere(winner_history == [winner.x, winner.y])][::-1]
+                if losses_final:
+                    # find candidate with smallest loss
+                    print("losses_final: ", losses_final)
+                    index_winner = np.argmin(np.array(losses_final))
+                    if index_winner:
+                        print("index_winner: ", index_winner)
+                        winner = candidates_final[index_winner]
+                        winner_history = get_history(winner, self.indexer_db)
+                        print("winner_history: ", winner_history)
+
+                        # return every future step of most suitable track starting with first prediction step
+                        start_index = winner_history.index(list((winner.x, winner.y)))
+                        #return winner_history[:np.argwhere(winner_history == [winner.x, winner.y])][::-1]
+                        print(np.array(winner_history)[start_index:][::-1])
+                        return np.array(winner_history)[start_index:][::-1]
+                    else:
+                        return None
+                else:
+                    return None
         else:
             return None
 
@@ -164,7 +179,14 @@ def get_direction(x, y, pre_x, pre_y):
         direction = np.array([x, y]) - np.array([pre_x, pre_y])
     except:
         return None
-    return np.linalg.norm(direction)
+    #return np.linalg.norm(direction)
+    return normalize(direction)
+
+def normalize(v):
+    norm = np.linalg.norm(v)
+    if norm == 0:
+       return v
+    return v / norm
 
 def is_same_tuple(this, other):
     """
@@ -185,7 +207,7 @@ def ped_is_in(point, list_of_points):
     Checks whether the ped id of point is also present in list_of_points
     :returns: Boolean, entry
     """
-    for entry in enumerate(list_of_points):
+    for _, entry in enumerate(list_of_points):
         if is_same_ped(point, entry) and not is_same_tuple(point, entry):
             return True, entry
     return False, None
